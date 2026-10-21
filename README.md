@@ -12,7 +12,8 @@ Páginas HTML autocontenidas, sin dependencias: se pueden abrir también con dob
 
 ## Licencia
 
-© 2026 Angel Ortiz. El código y los textos se publican con licencia MIT (ver `LICENSE`):
+© 2026 Angel Ortiz. Desarrollado con ayuda de IA (Claude, de Anthropic), bajo la dirección y
+revisión del autor. El código y los textos se publican con licencia MIT (ver `LICENSE`):
 se pueden usar, copiar, modificar y redistribuir libremente conservando el aviso de autoría.
 
 El logotipo de CECAC pertenece al centro y no está incluido en esta licencia.
