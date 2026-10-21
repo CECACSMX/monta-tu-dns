@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Guía de conceptos DNS · Monta tu DNS</title>
+<meta name="description" content="Guía de conceptos del DNS para SMX: espacio de nombres, zonas, registros, resolución y BIND9.">
+<link rel="icon" href="logo-cecac.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lexend:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --band:#24375F; --band-ink:#F2F6FF; --cyan:#00FBFE;
+  --bg:#EDF2FF; --surface:#FFFFFF; --ink:#1B2340; --muted:#5B6488; --line:#D6DDF2;
+  --brand:#5B47E0; --good:#14A05A; --good-soft:#DDF6E8; --bad:#E0364F; --bad-soft:#FDE3E7;
+  --t-zone:#24375F; --t-soa:#8B5CF6; --t-ns:#E0459B; --t-a:#2563EB; --t-cname:#0E9F9E; --t-mx:#E68A00; --t-ptr:#16A34A; --t-other:#64748B;
+  --f-display:"Baloo 2","Segoe UI",system-ui,sans-serif;
+  --f-body:"Lexend","Segoe UI",system-ui,sans-serif;
+  --f-mono:"Space Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#10142B; --surface:#1A2042; --ink:#ECEFFF; --muted:#A3AAD0; --line:#2E365F;
+    --brand:#A597FF; --good:#5FE09A; --good-soft:#163A2A; --bad:#FF7B8E; --bad-soft:#41202A;
+    --t-zone:#9FB4E8; --t-soa:#B79BFF; --t-ns:#FF7FC2; --t-a:#7FAEFF; --t-cname:#4FD9D6; --t-mx:#FFB84D; --t-ptr:#63D98A; --t-other:#A3AAD0;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#10142B; --surface:#1A2042; --ink:#ECEFFF; --muted:#A3AAD0; --line:#2E365F;
+  --brand:#A597FF; --good:#5FE09A; --good-soft:#163A2A; --bad:#FF7B8E; --bad-soft:#41202A;
+  --t-zone:#9FB4E8; --t-soa:#B79BFF; --t-ns:#FF7FC2; --t-a:#7FAEFF; --t-cname:#4FD9D6; --t-mx:#FFB84D; --t-ptr:#63D98A; --t-other:#A3AAD0;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6;padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);line-height:1.15;margin:0;text-wrap:balance}
+code,pre,.mono{font-family:var(--f-mono)}
+code{font-size:.88em;background:color-mix(in srgb,var(--brand) 10%,transparent);padding:1px 5px;border-radius:5px}
+a{color:var(--brand)}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+
+.band{background:var(--band);color:var(--band-ink);padding-top:env(safe-area-inset-top,0px)}
+.band .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-block:14px}
+.band img{height:56px;width:auto;display:block}
+.band h1{font-size:clamp(1.7rem,4vw,2.5rem);font-weight:800}
+.band h1 span{color:var(--cyan)}
+.band .meta{font-size:.8rem;opacity:.85;letter-spacing:.06em;text-transform:uppercase}
+.band .grow{flex:1;min-width:200px}
+.back{border:1px solid rgba(255,255,255,.4);color:var(--band-ink);border-radius:999px;padding:7px 16px;font-size:.9rem;text-decoration:none;font-weight:500}
+.back:hover{background:rgba(255,255,255,.12)}
+
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:28px;padding-block:24px 56px;align-items:start}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}}
+.toc{position:sticky;top:16px;background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:14px 16px}
+@media (max-width:860px){.toc{position:static}}
+.toc b{font-family:var(--f-display);font-size:1.05rem}
+.toc ol{margin:8px 0 0;padding-left:1.3em;font-size:.9rem}
+.toc li{margin:3px 0}
+.toc a{color:var(--ink);text-decoration:none}
+.toc a:hover{color:var(--brand);text-decoration:underline}
+
+main{min-width:0}
+section{min-width:0;background:var(--surface);border:2px solid var(--line);border-radius:18px;padding:22px 24px;margin-bottom:20px;position:relative;overflow:hidden}
+section::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:var(--c,var(--brand))}
+section h2{font-size:clamp(1.5rem,3vw,1.9rem);font-weight:800;margin-bottom:10px;display:flex;gap:10px;align-items:baseline}
+section h2 .n{font-size:.95rem;background:var(--c,var(--brand));color:#fff;border-radius:8px;padding:0 9px}
+section h3{font-size:1.2rem;margin:20px 0 6px}
+section p{margin:0 0 12px;max-width:72ch}
+section ul,section ol{margin:0 0 12px;padding-left:1.3em;max-width:72ch}
+section li{margin:4px 0}
+
+pre{background:var(--bg);border-radius:12px;padding:12px 16px;margin:0 0 14px;overflow-x:auto;font-size:.86rem;line-height:1.55}
+pre .c{color:var(--muted)}
+pre .k{color:var(--brand);font-weight:700}
+.note{border-left:5px solid var(--c,var(--brand));background:color-mix(in srgb,var(--c,var(--brand)) 9%,var(--surface));border-radius:0 12px 12px 0;padding:10px 14px;margin:0 0 14px;font-size:.95rem}
+.note.warn{--c:var(--bad)}
+.note.ok{--c:var(--good)}
+
+.tree{display:flex;flex-direction:column;align-items:stretch;text-align:center;gap:0;margin:8px 0 16px;font-family:var(--f-mono);font-size:.85rem}
+.tree .lvl{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.tree .nd{border:2px solid var(--line);background:var(--bg);border-radius:10px;padding:4px 10px;text-align:center}
+.tree .nd small{display:block;font-family:var(--f-body);color:var(--muted);font-size:.7rem}
+.tree .nd.hl{border-color:var(--t-zone);background:color-mix(in srgb,var(--t-zone) 14%,var(--surface))}
+.tree .arr{color:var(--muted);line-height:1.2;padding:2px 0}
+
+.fqdn{display:flex;flex-wrap:wrap;gap:2px;font-family:var(--f-mono);font-size:clamp(1rem,2.6vw,1.35rem);font-weight:700;margin:6px 0 14px}
+.fqdn span{padding:4px 8px;border-radius:8px;text-align:center}
+.fqdn small{display:block;font-family:var(--f-body);font-weight:500;font-size:.68rem;opacity:.85}
+.fqdn .h{background:color-mix(in srgb,var(--t-a) 18%,transparent)}
+.fqdn .d{background:color-mix(in srgb,var(--t-zone) 18%,transparent)}
+.fqdn .t{background:color-mix(in srgb,var(--t-mx) 20%,transparent)}
+.fqdn .r{background:color-mix(in srgb,var(--t-ns) 20%,transparent)}
+
+.tbl{overflow-x:auto;margin:0 0 14px}
+table{border-collapse:collapse;width:100%;font-size:.92rem;min-width:620px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-display);font-size:1rem;color:var(--muted);font-weight:700}
+td code{white-space:nowrap}
+.ty{display:inline-block;min-width:4.4em;text-align:center;font-family:var(--f-mono);font-weight:700;font-size:.8rem;color:#fff;background:var(--c);border-radius:6px;padding:1px 6px}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:0 0 14px}
+.card{border:2px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--bg)}
+.card h4{margin:0 0 4px;font-family:var(--f-display);font-size:1.1rem;color:var(--c,var(--ink))}
+.card p{margin:0;font-size:.92rem}
+
+.steps{counter-reset:s;list-style:none;padding:0!important}
+.steps li{counter-increment:s;position:relative;padding-left:44px;margin:10px 0}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--c,var(--brand));color:#fff;font-family:var(--f-display);font-weight:800}
+
+dl.glos{display:grid;grid-template-columns:minmax(120px,max-content) 1fr;gap:6px 18px;margin:0}
+dl.glos dt{font-family:var(--f-mono);font-weight:700}
+dl.glos dd{margin:0;color:var(--ink)}
+@media (max-width:520px){section{padding:18px 16px}dl.glos{grid-template-columns:1fr}dl.glos dd{margin-bottom:8px}}
+
+.cta{display:inline-block;background:var(--brand);color:#fff;text-decoration:none;font-family:var(--f-display);font-weight:800;font-size:1.1rem;padding:8px 22px;border-radius:12px;box-shadow:0 4px 0 color-mix(in srgb,var(--brand) 60%,#000)}
+footer{color:var(--muted);font-size:.85rem;text-align:center;padding-bottom:30px}
+@media print{.toc,.back,.cta{display:none}.layout{display:block}section{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="band">
+  <div class="wrap">
+    <img src="logo-cecac.jpg" alt="CECAC">
+    <div class="grow">
+      <h1>Guía de conceptos <span>DNS</span></h1>
+      <div class="meta">MP07 Servicios de Red · RA2 · Monta tu DNS</div>
+    </div>
+    <a class="back" href="index.html">← Volver a «Monta tu DNS»</a>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <nav class="toc" aria-label="Índice">
+    <b>Índice</b>
+    <ol>
+      <li><a href="#que">¿Qué es el DNS?</a></li>
+      <li><a href="#arbol">El árbol de nombres</a></li>
+      <li><a href="#zonas">Zonas</a></li>
+      <li><a href="#registros">Registros</a></li>
+      <li><a href="#soa">El SOA por dentro</a></li>
+      <li><a href="#resolucion">Cómo se resuelve un nombre</a></li>
+      <li><a href="#servidores">Tipos de servidor</a></li>
+      <li><a href="#bind">BIND9 en Ubuntu</a></li>
+      <li><a href="#comprobar">Comprobar y consultar</a></li>
+      <li><a href="#errores">Errores típicos</a></li>
+      <li><a href="#glosario">Glosario</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="que">
+      <h2><span class="n">1</span>¿Qué es el DNS?</h2>
+      <p>Los equipos de una red se comunican por su <b>dirección IP</b> (por ejemplo, <code>10.10.0.10</code>), pero a las personas nos resulta más fácil recordar <b>nombres</b> (<code>www.smx.lan</code>). El <b>DNS</b> (<i>Domain Name System</i>, sistema de nombres de dominio) es el servicio que traduce nombres a direcciones IP y direcciones IP a nombres.</p>
+      <ul>
+        <li>Trabaja en la <b>capa de aplicación</b> y usa el <b>puerto 53</b>: UDP para las consultas normales y TCP para respuestas grandes y transferencias de zona.</li>
+        <li>Es una <b>base de datos distribuida</b>: ningún servidor lo sabe todo; cada uno se encarga de su parte y sabe a quién preguntar por el resto.</li>
+        <li>Es <b>jerárquico</b>: los nombres forman un árbol que empieza en la raíz.</li>
+      </ul>
+      <div class="note">Es como la agenda del móvil: buscas «Marta» y el móvil marca su número sin que tengas que sabértelo.</div>
+    </section>
+
+    <section id="arbol" style="--c:var(--t-ns)">
+      <h2><span class="n">2</span>El árbol de nombres</h2>
+      <p>Los nombres DNS se leen <b>de derecha a izquierda</b>, del nivel más general al más concreto. Cada parte separada por un punto es una <b>etiqueta</b>.</p>
+      <div class="tree" aria-label="Árbol DNS de ejemplo">
+        <div class="lvl"><div class="nd">.<small>raíz</small></div></div>
+        <div class="arr">│</div>
+        <div class="lvl"><div class="nd">com<small>TLD genérico</small></div><div class="nd">cat<small>TLD</small></div><div class="nd hl">lan<small>TLD privado</small></div><div class="nd">arpa<small>infraestructura</small></div></div>
+        <div class="arr">│</div>
+        <div class="lvl"><div class="nd">google<small>dominio</small></div><div class="nd">xtec<small>dominio</small></div><div class="nd hl">smx<small>nuestro dominio</small></div><div class="nd">in-addr<small>zonas inversas</small></div></div>
+        <div class="arr">│</div>
+        <div class="lvl"><div class="nd">www</div><div class="nd hl">ns1 · srv1 · pc01 · www<small>equipos (hosts)</small></div></div>
+      </div>
+      <ul>
+        <li><b>Raíz (<code>.</code>)</b>: la cima del árbol. La sirven 13 grupos de servidores raíz repartidos por el mundo.</li>
+        <li><b>TLD</b> (<i>Top Level Domain</i>, dominio de primer nivel): <code>.com</code>, <code>.org</code>, <code>.es</code>, <code>.cat</code>… En el laboratorio usamos <code>.lan</code>, que no existe en internet y solo vale dentro de nuestra red.</li>
+        <li><b>Dominio</b> y <b>subdominio</b>: <code>smx.lan</code> es un dominio dentro de <code>lan</code>; <code>aula1.smx.lan</code> sería un subdominio de <code>smx.lan</code>.</li>
+        <li><b>Host</b>: el nombre de un equipo concreto, como <code>pc01</code>.</li>
+      </ul>
+      <h3>FQDN: el nombre completo</h3>
+      <p>Un <b>FQDN</b> (<i>Fully Qualified Domain Name</i>) es el nombre completo de un equipo, desde el host hasta la raíz:</p>
+      <div class="fqdn"><span class="h">pc01<small>host</small></span><span>.</span><span class="d">smx<small>dominio</small></span><span>.</span><span class="t">lan<small>TLD</small></span><span class="r">.<small>raíz</small></span></div>
+      <div class="note warn"><b>El punto final importa.</b> En los archivos de zona, <code>pc01.smx.lan.</code> (con punto) es un nombre completo. Sin el punto, BIND le añade el dominio detrás y queda <code>pc01.smx.lan.smx.lan.</code>, que no existe. Los nombres cortos (<code>pc01</code>) se escriben sin punto y BIND los completa solo.</div>
+    </section>
+
+    <section id="zonas" style="--c:var(--t-zone)">
+      <h2><span class="n">3</span>Zonas</h2>
+      <p>Una <b>zona</b> es la parte del árbol de nombres de la que se encarga un servidor DNS. Se guarda en un <b>archivo de zona</b> con todos sus registros. Dominio y zona no son lo mismo: el dominio es el nombre (<code>smx.lan</code>); la zona es la parte que administra un servidor concreto (puede delegar subdominios en otros servidores).</p>
+      <div class="cards">
+        <div class="card" style="--c:var(--t-a)"><h4>Zona directa</h4><p>Traduce <b>nombre → IP</b>. Se llama como el dominio: <code>smx.lan</code>. Contiene registros A, AAAA, CNAME, MX…</p></div>
+        <div class="card" style="--c:var(--t-ptr)"><h4>Zona inversa</h4><p>Traduce <b>IP → nombre</b>. Contiene registros PTR. Su nombre es la parte de red de la IP <b>al revés</b> + <code>.in-addr.arpa</code>.</p></div>
+      </div>
+      <h3>Cómo se nombra la zona inversa</h3>
+      <p>Para la red <code>10.10.0.0/24</code> se toman los tres primeros octetos (la parte de red), se invierten y se añade <code>in-addr.arpa</code>:</p>
+      <pre>10.10.0  →  0.10.10  →  <span class="k">0.10.10.in-addr.arpa</span>
+
+<span class="c">; dentro de la zona solo se escribe el último octeto (la parte de host)</span>
+101   IN   PTR   pc01.smx.lan.     <span class="c">; 10.10.0.101 → pc01.smx.lan</span></pre>
+      <p>Se escribe al revés porque en el DNS lo general va a la derecha: en una IP lo general (la red) va a la izquierda.</p>
+      <h3>Servidor maestro y esclavo</h3>
+      <ul>
+        <li><b>Maestro (primario, <code>type master</code>)</b>: tiene el archivo original de la zona; los cambios se hacen aquí.</li>
+        <li><b>Esclavo (secundario, <code>type slave</code>)</b>: guarda una copia que pide al maestro mediante una <b>transferencia de zona</b> (AXFR). Si el maestro cae, el esclavo sigue respondiendo. En la práctica, <code>pc02</code> hace de secundario.</li>
+        <li>El esclavo solo copia la zona si el <b>número de serie</b> del SOA del maestro es mayor que el suyo. Por eso hay que <b>subir el serial</b> en cada cambio.</li>
+      </ul>
+    </section>
+
+    <section id="registros" style="--c:var(--t-a)">
+      <h2><span class="n">4</span>Registros (RR)</h2>
+      <p>Cada línea de un archivo de zona es un <b>registro de recurso</b> (<i>Resource Record</i>). Todos siguen el mismo formato:</p>
+      <pre><span class="k">nombre</span>   [TTL]   <span class="k">clase</span>   <span class="k">tipo</span>   <span class="k">dato</span>
+pc01              IN      A       10.10.0.101</pre>
+      <ul>
+        <li><b>nombre</b>: a qué se refiere. <code>@</code> significa «el propio dominio» (<code>smx.lan.</code>).</li>
+        <li><b>TTL</b> (opcional): segundos que otros servidores pueden guardar la respuesta en caché.</li>
+        <li><b>clase</b>: casi siempre <code>IN</code> (Internet).</li>
+        <li><b>tipo</b> y <b>dato</b>: qué clase de información es y su valor.</li>
+      </ul>
+      <div class="tbl">
+      <table>
+        <thead><tr><th>Tipo</th><th>Para qué sirve</th><th>Ejemplo en smx.lan</th></tr></thead>
+        <tbody>
+          <tr><td><span class="ty" style="--c:var(--t-soa)">SOA</span></td><td><b>Start Of Authority</b>. Primer registro de toda zona: servidor principal, correo del responsable, número de serie y tiempos.</td><td><code>@ IN SOA ns1.smx.lan. admin.smx.lan. (…)</code></td></tr>
+          <tr><td><span class="ty" style="--c:var(--t-ns)">NS</span></td><td><b>Name Server</b>. Qué servidores DNS tienen autoridad sobre la zona. Apunta a un <b>nombre</b>, nunca a una IP.</td><td><code>@ IN NS ns1.smx.lan.</code></td></tr>
+          <tr><td><span class="ty" style="--c:var(--t-a)">A</span></td><td><b>Address</b>. Nombre → dirección <b>IPv4</b>. El más usado.</td><td><code>pc01 IN A 10.10.0.101</code></td></tr>
+          <tr><td><span class="ty" style="--c:var(--t-a)">AAAA</span></td><td>Igual que A pero para direcciones <b>IPv6</b>.</td><td><code>pc01 IN AAAA fd00::101</code></td></tr>
+          <tr><td><span class="ty" style="--c:var(--t-cname)">CNAME</span></td><td><b>Canonical Name</b>. Alias: otro nombre para un equipo que ya tiene registro A.</td><td><code>www IN CNAME ns1</code></td></tr>
+          <tr><td><span class="ty" style="--c:var(--t-mx)">MX</span></td><td><b>Mail eXchanger</b>. Servidor que recibe el correo del dominio, con una <b>prioridad</b>: el número más bajo es el preferido.</td><td><code>@ IN MX 10 srv1.smx.lan.</code></td></tr>
+          <tr><td><span class="ty" style="--c:var(--t-ptr)">PTR</span></td><td><b>Pointer</b>. IP → nombre. Solo en zonas inversas.</td><td><code>101 IN PTR pc01.smx.lan.</code></td></tr>
+          <tr><td><span class="ty" style="--c:var(--t-other)">TXT</span></td><td>Texto libre. Se usa para verificar dominios y para el correo (SPF, DKIM).</td><td><code>@ IN TXT "v=spf1 mx -all"</code></td></tr>
+          <tr><td><span class="ty" style="--c:var(--t-other)">SRV</span></td><td><b>Service</b>. Dónde está un servicio concreto (prioridad, peso, puerto y equipo). Lo usa, por ejemplo, Active Directory.</td><td><code>_ldap._tcp IN SRV 0 0 389 srv1</code></td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="note warn"><b>Reglas que dan error si no se cumplen:</b>
+        <ul style="margin:6px 0 0">
+          <li>Un nombre con <b>CNAME</b> no puede tener ningún otro registro.</li>
+          <li><b>NS</b> y <b>MX</b> deben apuntar a un nombre con registro <b>A</b>, nunca a un alias (CNAME) ni a una IP.</li>
+          <li>Toda zona necesita <b>un SOA</b> y <b>al menos un NS</b>, y ese NS necesita su registro A.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="soa" style="--c:var(--t-soa)">
+      <h2><span class="n">5</span>El SOA por dentro</h2>
+      <pre><span class="k">$TTL</span> 604800                      <span class="c">; TTL por defecto de la zona (1 semana)</span>
+@   IN   SOA   ns1.smx.lan.  admin.smx.lan. (
+               2026102001   <span class="c">; Serial  → AAAAMMDDnn: fecha + nº de cambio del día</span>
+               604800       <span class="c">; Refresh → cada cuánto el esclavo mira si hay cambios</span>
+               86400        <span class="c">; Retry   → si falla, cuándo vuelve a intentarlo</span>
+               2419200      <span class="c">; Expire  → cuándo deja de responder si no contacta con el maestro</span>
+               604800 )     <span class="c">; Negative TTL → tiempo en caché de un «no existe»</span></pre>
+      <ul>
+        <li><code>ns1.smx.lan.</code>: el servidor <b>primario</b> de la zona.</li>
+        <li><code>admin.smx.lan.</code>: el <b>correo del responsable</b>, con un punto en lugar de la arroba (<code>admin@smx.lan</code>).</li>
+        <li><b>Serial</b>: <b>súbelo cada vez que cambies la zona</b>. Si no, los secundarios y las cachés no se enteran del cambio. El formato fecha + contador (<code>2026102001</code>, <code>2026102002</code>…) evita equivocarse.</li>
+        <li>Los tiempos van en segundos: 86400 s = 1 día; 604800 s = 1 semana.</li>
+      </ul>
+    </section>
+
+    <section id="resolucion" style="--c:var(--t-cname)">
+      <h2><span class="n">6</span>Cómo se resuelve un nombre</h2>
+      <p>Cuando <code>pc01</code> quiere visitar <code>www.xtec.cat</code>, ocurre esto:</p>
+      <ol class="steps">
+        <li>El <b>resolver</b> de pc01 (la parte del sistema que hace preguntas DNS) mira primero su <b>caché</b> y el archivo <code>hosts</code>. Si no lo sabe, pregunta a su servidor DNS (<code>ns1</code>). Es una consulta <b>recursiva</b>: «dame la respuesta final».</li>
+        <li><code>ns1</code> mira si es <b>autoritativo</b> para ese nombre (si lo tiene en sus zonas) o si lo tiene en caché. Como <code>xtec.cat</code> no es suyo, sale a buscarlo.</li>
+        <li>Pregunta a un <b>servidor raíz</b>: «¿quién lleva <code>.cat</code>?». La raíz no sabe la respuesta, pero le indica los servidores de <code>.cat</code>. Son consultas <b>iterativas</b>: cada servidor responde con lo que sabe o con a quién preguntar.</li>
+        <li>Pregunta a los servidores de <code>.cat</code>: «¿quién lleva <code>xtec.cat</code>?». Le dan los NS de <code>xtec.cat</code>.</li>
+        <li>Pregunta al servidor autoritativo de <code>xtec.cat</code>, que responde con el registro A de <code>www</code>.</li>
+        <li><code>ns1</code> guarda la respuesta en <b>caché</b> durante su <b>TTL</b> y se la da a pc01. La próxima vez que alguien lo pregunte, responderá al momento.</li>
+      </ol>
+      <div class="note">Si <code>ns1</code> está configurado con <b>reenviadores</b> (<i>forwarders</i>), como <code>8.8.8.8</code>, no hace los pasos 3 a 5: pasa la pregunta al reenviador y espera la respuesta. Es lo que ves en «Monta tu DNS» cuando preguntas por un nombre de internet.</div>
+      <div class="cards">
+        <div class="card"><h4>Consulta recursiva</h4><p>El cliente pide la respuesta completa y el servidor hace todo el trabajo.</p></div>
+        <div class="card"><h4>Consulta iterativa</h4><p>El servidor contesta lo que sabe o remite a otro servidor más cercano a la respuesta.</p></div>
+        <div class="card"><h4>Respuesta autoritativa</h4><p>Viene del servidor que tiene la zona (flag <code>aa</code> en <code>dig</code>). Una respuesta de caché no lo es.</p></div>
+      </div>
+    </section>
+
+    <section id="servidores" style="--c:var(--t-mx)">
+      <h2><span class="n">7</span>Tipos de servidor DNS</h2>
+      <div class="cards">
+        <div class="card"><h4>Autoritativo</h4><p>Tiene zonas propias y responde por ellas con autoridad. Puede ser maestro o esclavo.</p></div>
+        <div class="card"><h4>Solo caché (recursivo)</h4><p>No tiene zonas: busca las respuestas por los clientes y las guarda en caché para ir más rápido.</p></div>
+        <div class="card"><h4>Reenviador</h4><p>Pasa las consultas que no sabe a otro servidor (el del proveedor, 8.8.8.8, 1.1.1.1…).</p></div>
+      </div>
+      <p>El <code>ns1</code> del laboratorio hace las tres cosas: es <b>maestro</b> de <code>smx.lan</code> y de su zona inversa, y <b>reenvía y guarda en caché</b> todo lo demás.</p>
+    </section>
+
+    <section id="bind" style="--c:var(--t-zone)">
+      <h2><span class="n">8</span>BIND9 en Ubuntu</h2>
+      <p><b>BIND9</b> es el servidor DNS más usado en Linux. Se instala con <code>sudo apt install bind9 bind9utils</code> y su configuración está en <code>/etc/bind/</code>.</p>
+      <div class="tbl">
+      <table>
+        <thead><tr><th>Archivo</th><th>Qué contiene</th></tr></thead>
+        <tbody>
+          <tr><td><code>named.conf</code></td><td>Archivo principal. Solo incluye los otros tres.</td></tr>
+          <tr><td><code>named.conf.options</code></td><td>Opciones generales: reenviadores, quién puede consultar, recursión.</td></tr>
+          <tr><td><code>named.conf.local</code></td><td><b>Nuestras zonas</b>: nombre, tipo (master/slave) y archivo.</td></tr>
+          <tr><td><code>db.smx.lan</code></td><td>Archivo de la <b>zona directa</b>.</td></tr>
+          <tr><td><code>db.10.10.0</code></td><td>Archivo de la <b>zona inversa</b>.</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <h3>named.conf.options</h3>
+      <pre>options {
+    directory "/var/cache/bind";
+    <span class="k">forwarders</span> { 8.8.8.8; 1.1.1.1; };    <span class="c">// a quién preguntar lo que no es nuestro</span>
+    <span class="k">allow-query</span> { localhost; 10.10.0.0/24; };
+    recursion yes;
+    listen-on { any; };
+};</pre>
+      <h3>named.conf.local</h3>
+      <pre>zone <span class="k">"smx.lan"</span> {
+    type master;
+    file "/etc/bind/db.smx.lan";
+    allow-transfer { 10.10.0.102; };      <span class="c">// IP del secundario</span>
+};
+
+zone <span class="k">"0.10.10.in-addr.arpa"</span> {
+    type master;
+    file "/etc/bind/db.10.10.0";
+};</pre>
+      <h3>Zona directa · /etc/bind/db.smx.lan</h3>
+      <pre>$TTL 604800
+@        IN   SOA    ns1.smx.lan. admin.smx.lan. (
+                     2026102001 604800 86400 2419200 604800 )
+@        IN   NS     ns1.smx.lan.
+@        IN   MX     10 srv1.smx.lan.
+
+ns1      IN   A      10.10.0.10
+srv1     IN   A      10.10.0.11
+pc01     IN   A      10.10.0.101
+
+www      IN   CNAME  ns1
+correo   IN   CNAME  srv1</pre>
+      <h3>Zona inversa · /etc/bind/db.10.10.0</h3>
+      <pre>$TTL 604800
+@        IN   SOA    ns1.smx.lan. admin.smx.lan. (
+                     2026102001 604800 86400 2419200 604800 )
+@        IN   NS     ns1.smx.lan.
+
+10       IN   PTR    ns1.smx.lan.
+11       IN   PTR    srv1.smx.lan.
+101      IN   PTR    pc01.smx.lan.</pre>
+      <div class="note">En la zona inversa los nombres de la derecha van <b>siempre completos y con punto final</b>: si escribieras <code>pc01</code>, BIND lo completaría con <code>0.10.10.in-addr.arpa.</code></div>
+      <h3>El cliente</h3>
+      <p>Para que un equipo use nuestro DNS, su servidor DNS debe ser <code>10.10.0.10</code>. En Ubuntu se indica en Netplan (<code>nameservers: addresses: [10.10.0.10]</code>, <code>search: [smx.lan]</code>) y se comprueba con <code>resolvectl status</code>. En Windows, en las propiedades IPv4 del adaptador o con <code>ipconfig /all</code>.</p>
+    </section>
+
+    <section id="comprobar" style="--c:var(--good)">
+      <h2><span class="n">9</span>Comprobar y consultar</h2>
+      <h3>Antes de reiniciar: revisar la sintaxis</h3>
+      <pre>sudo <span class="k">named-checkconf</span>                                  <span class="c"># sin salida = todo bien</span>
+sudo <span class="k">named-checkzone</span> smx.lan /etc/bind/db.smx.lan
+sudo <span class="k">named-checkzone</span> 0.10.10.in-addr.arpa /etc/bind/db.10.10.0
+sudo systemctl restart bind9        <span class="c"># o: sudo rndc reload</span>
+sudo systemctl status bind9</pre>
+      <h3>Consultas</h3>
+      <div class="tbl">
+      <table>
+        <thead><tr><th>Orden</th><th>Qué hace</th></tr></thead>
+        <tbody>
+          <tr><td><code>dig pc01.smx.lan</code></td><td>Pregunta el registro A. Mira la <b>ANSWER SECTION</b> y el flag <code>aa</code>.</td></tr>
+          <tr><td><code>dig smx.lan MX</code></td><td>Pregunta un tipo concreto (MX, NS, SOA, TXT…).</td></tr>
+          <tr><td><code>dig -x 10.10.0.101</code></td><td>Búsqueda inversa (PTR).</td></tr>
+          <tr><td><code>dig @10.10.0.10 www.smx.lan</code></td><td>Pregunta a un servidor concreto.</td></tr>
+          <tr><td><code>dig +short www.smx.lan</code></td><td>Solo la respuesta, sin detalles.</td></tr>
+          <tr><td><code>dig @10.10.0.10 smx.lan AXFR</code></td><td>Pide la zona entera (solo si <code>allow-transfer</code> lo permite).</td></tr>
+          <tr><td><code>nslookup www.smx.lan</code></td><td>Consulta sencilla; existe también en Windows.</td></tr>
+          <tr><td><code>host 10.10.0.10</code></td><td>Respuesta en una línea, directa o inversa.</td></tr>
+          <tr><td><code>sudo journalctl -u named</code></td><td>Registro del servicio: aquí salen los errores de carga de zonas.</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <h3>Respuestas de dig que hay que saber leer</h3>
+      <ul>
+        <li><code>status: NOERROR</code>: la consulta ha ido bien (aunque puede venir sin respuesta si ese tipo de registro no existe).</li>
+        <li><code>status: NXDOMAIN</code>: el nombre <b>no existe</b> en la zona.</li>
+        <li><code>status: SERVFAIL</code>: el servidor ha fallado; casi siempre la zona no ha cargado por un error de sintaxis.</li>
+        <li><code>status: REFUSED</code>: el servidor no acepta consultas de ese cliente (<code>allow-query</code>).</li>
+      </ul>
+    </section>
+
+    <section id="errores" style="--c:var(--bad)">
+      <h2><span class="n">10</span>Errores típicos</h2>
+      <div class="tbl">
+      <table>
+        <thead><tr><th>Síntoma</th><th>Causa probable</th></tr></thead>
+        <tbody>
+          <tr><td>Aparecen nombres como <code>pc01.smx.lan.smx.lan</code></td><td>Falta el <b>punto final</b> en un nombre completo.</td></tr>
+          <tr><td>El cambio no se ve en el secundario</td><td>No se ha <b>subido el serial</b> del SOA.</td></tr>
+          <tr><td><code>SERVFAIL</code> en todo el dominio</td><td>Error de sintaxis en la zona. Pásale <code>named-checkzone</code>.</td></tr>
+          <tr><td><code>dig -x</code> no devuelve nada</td><td>Zona inversa mal nombrada (la red no está al revés) o no declarada en <code>named.conf.local</code>.</td></tr>
+          <tr><td>«CNAME and other data»</td><td>Un nombre con CNAME tiene también otro registro.</td></tr>
+          <tr><td>El cliente no usa nuestro DNS</td><td>Su DNS no es <code>10.10.0.10</code>. Revisa Netplan o <code>resolvectl status</code>.</td></tr>
+          <tr><td>Los nombres de internet no resuelven</td><td>Faltan los <code>forwarders</code> o el servidor no tiene salida a internet.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="glosario" style="--c:var(--t-other)">
+      <h2><span class="n">11</span>Glosario</h2>
+      <dl class="glos">
+        <dt>DNS</dt><dd>Sistema de nombres de dominio: traduce nombres a IP y al revés.</dd>
+        <dt>FQDN</dt><dd>Nombre completo de un equipo, terminado en punto: <code>pc01.smx.lan.</code></dd>
+        <dt>TLD</dt><dd>Dominio de primer nivel: <code>.com</code>, <code>.es</code>, <code>.lan</code>…</dd>
+        <dt>Zona</dt><dd>Parte del espacio de nombres que administra un servidor.</dd>
+        <dt>Zona directa</dt><dd>Nombre → IP.</dd>
+        <dt>Zona inversa</dt><dd>IP → nombre, bajo <code>in-addr.arpa</code>.</dd>
+        <dt>RR</dt><dd>Registro de recurso: cada línea de una zona.</dd>
+        <dt>TTL</dt><dd>Tiempo, en segundos, que una respuesta puede quedarse en caché.</dd>
+        <dt>Serial</dt><dd>Número de versión de la zona, dentro del SOA.</dd>
+        <dt>Maestro / esclavo</dt><dd>Servidor con la zona original / con una copia.</dd>
+        <dt>AXFR</dt><dd>Transferencia completa de zona del maestro al esclavo.</dd>
+        <dt>Resolver</dt><dd>Parte del cliente que hace las preguntas DNS.</dd>
+        <dt>Autoritativo</dt><dd>Servidor que tiene la zona y responde por ella.</dd>
+        <dt>Forwarder</dt><dd>Servidor al que se reenvían las consultas que no son nuestras.</dd>
+        <dt>@</dt><dd>En un archivo de zona, el propio dominio (<code>smx.lan.</code>).</dd>
+        <dt>BIND9 / named</dt><dd>El servidor DNS de Linux / el nombre de su proceso.</dd>
+      </dl>
+    </section>
+
+    <p style="text-align:center"><a class="cta" href="index.html">Practica en «Monta tu DNS» →</a></p>
+  </main>
+</div>
+<footer class="wrap">CECAC · SMX · MP07 Servicios de Red · RA2</footer>
+</body>
+</html>

@@ -1,0 +1,453 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Monta tu DNS</title><meta name="description" content="Monta paso a paso un servidor DNS: zonas y registros SOA, NS, A, CNAME, MX y PTR (SMX · MP07)."><link rel="icon" href="logo-cecac.jpg"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lexend:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: franja CECAC + barra de 9 pasos; a la izquierda la lección y el reto, a la derecha la escena (PC ↔ DNS) y el servidor ns1 que se va llenando */
+:root{
+  --band:#24375F; --band-ink:#F2F6FF; --cyan:#00FBFE;
+  --bg:#EDF2FF; --surface:#FFFFFF; --ink:#1B2340; --muted:#5B6488; --line:#D6DDF2;
+  --brand:#5B47E0; --brand-soft:#E9E5FF; --good:#14A05A; --good-soft:#DDF6E8; --bad:#E0364F; --bad-soft:#FDE3E7;
+  --t-zone:#24375F; --t-soa:#8B5CF6; --t-ns:#E0459B; --t-a:#2563EB; --t-cname:#0E9F9E; --t-mx:#E68A00; --t-ptr:#16A34A;
+  --f-display:"Baloo 2", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Lexend", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"Space Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#10142B; --surface:#1A2042; --ink:#ECEFFF; --muted:#A3AAD0; --line:#2E365F;
+    --brand:#A597FF; --brand-soft:#2C2860; --good:#5FE09A; --good-soft:#163A2A; --bad:#FF7B8E; --bad-soft:#41202A;
+    --t-zone:#9FB4E8; --t-soa:#B79BFF; --t-ns:#FF7FC2; --t-a:#7FAEFF; --t-cname:#4FD9D6; --t-mx:#FFB84D; --t-ptr:#63D98A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#10142B; --surface:#1A2042; --ink:#ECEFFF; --muted:#A3AAD0; --line:#2E365F;
+  --brand:#A597FF; --brand-soft:#2C2860; --good:#5FE09A; --good-soft:#163A2A; --bad:#FF7B8E; --bad-soft:#41202A;
+  --t-zone:#9FB4E8; --t-soa:#B79BFF; --t-ns:#FF7FC2; --t-a:#7FAEFF; --t-cname:#4FD9D6; --t-mx:#FFB84D; --t-ptr:#63D98A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+h1,h2,h3{font-family:var(--f-display);margin:0;line-height:1.1;text-wrap:balance}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+code,.mono{font-family:var(--f-mono)}
+
+.band{background:var(--band);color:var(--band-ink)}
+.band .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-block:14px}
+.band img{height:56px;width:auto;display:block}
+.band h1{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800}
+.band h1 span{color:var(--cyan)}
+.band .meta{font-size:.8rem;opacity:.85;letter-spacing:.06em;text-transform:uppercase}
+.band .grow{flex:1}
+.sound{border:1px solid rgba(255,255,255,.35);background:transparent;color:var(--band-ink);border-radius:999px;padding:6px 14px;font-size:.85rem}
+.sound[aria-pressed="false"]{opacity:.6}
+
+/* progreso */
+.progress{display:flex;gap:6px;flex-wrap:wrap;padding-block:16px 4px}
+.pill{display:flex;align-items:center;gap:6px;border:2px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:4px 12px 4px 5px;font-size:.82rem;font-weight:500}
+.pill i{font-style:normal;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--line);color:var(--ink);font-family:var(--f-display);font-weight:800;font-size:.85rem}
+.pill.done{border-color:var(--c,var(--good));color:var(--ink)}
+.pill.done i{background:var(--c,var(--good));color:#fff}
+.pill.cur{border-color:var(--c,var(--brand));color:var(--ink);box-shadow:0 0 0 3px color-mix(in srgb,var(--c,var(--brand)) 25%,transparent)}
+.pill:disabled{cursor:not-allowed;opacity:.55}
+
+.main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;padding-block:14px 40px;align-items:start}
+@media (max-width:920px){.main{grid-template-columns:1fr}}
+
+/* lección */
+.lesson{background:var(--surface);border-radius:18px;padding:22px 24px 20px;border:2px solid var(--line);position:relative;overflow:hidden}
+.lesson::before{content:"";position:absolute;inset:0 0 auto 0;height:8px;background:var(--c)}
+.tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:800;font-size:.95rem;color:var(--c);letter-spacing:.02em}
+.tag b{background:var(--c);color:#fff;border-radius:8px;padding:0 10px;font-size:1.05rem}
+.lesson h2{font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:800;margin:6px 0 10px}
+.lesson p{margin:0 0 12px;max-width:62ch}
+.analogy{display:flex;gap:14px;align-items:center;background:color-mix(in srgb,var(--c) 10%,var(--surface));border-radius:14px;padding:12px 16px;margin:6px 0 16px;flex-wrap:wrap}
+.analogy .ico{font-family:var(--f-display);font-weight:800;font-size:1.6rem;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;background:var(--c);color:#fff;flex:none}
+.analogy p{margin:0;flex:1;min-width:200px;font-size:.95rem}
+.example{font-family:var(--f-mono);font-size:.9rem;background:var(--bg);border-radius:10px;padding:10px 14px;margin:0 0 16px;overflow-x:auto;white-space:pre}
+.example .c{color:var(--muted)}
+
+.challenge{border:2px dashed var(--c);border-radius:14px;padding:14px 16px 16px}
+.challenge h3{font-size:1.15rem;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.line{font-family:var(--f-mono);font-size:clamp(.82rem,1.8vw,1rem);display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.line .kw{font-weight:700;color:var(--c)}
+.slot{min-width:8.5em;min-height:2.3em;border:2px dashed var(--muted);border-radius:10px;display:inline-grid;place-items:center;padding:2px 10px;color:var(--muted);font-size:.85em;transition:background .15s,border-color .15s,transform .15s}
+.slot.over,.slot.armed{border-color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--ink)}
+.slot.filled{border-style:solid;border-color:var(--good);background:var(--good-soft);color:var(--ink);font-weight:700}
+.slot.wrong{border-color:var(--bad);background:var(--bad-soft);animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.cards{display:flex;flex-wrap:wrap;gap:10px}
+.card{font-family:var(--f-mono);font-weight:700;font-size:.92rem;border:2px solid var(--c);background:var(--surface);color:var(--ink);border-radius:12px;padding:8px 14px;box-shadow:0 3px 0 var(--c);transition:transform .12s,box-shadow .12s;touch-action:manipulation;user-select:none}
+.card:hover{transform:translateY(-2px);box-shadow:0 5px 0 var(--c)}
+.card[aria-pressed="true"]{background:var(--c);color:#fff}
+.card.used{opacity:.3;pointer-events:none;box-shadow:none}
+.card.dragging{opacity:.5}
+.hint{margin-top:12px;font-size:.92rem;min-height:1.5em}
+.hint.bad{color:var(--bad)} .hint.good{color:var(--good);font-weight:600}
+.nav{display:flex;justify-content:space-between;gap:10px;margin-top:18px;flex-wrap:wrap}
+.btn{border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:9px 18px;font-weight:600}
+.btn:hover{border-color:var(--brand)}
+.btn.go{background:var(--brand);border-color:var(--brand);color:#fff;font-family:var(--f-display);font-size:1.1rem;font-weight:800;padding:6px 22px;box-shadow:0 4px 0 color-mix(in srgb,var(--brand) 60%,#000)}
+.btn.go:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+.btn.go.pulse{animation:pulse 1.2s infinite}
+@keyframes pulse{50%{transform:scale(1.05)}}
+
+/* escena */
+.side{display:flex;flex-direction:column;gap:16px}
+.scene{background:var(--surface);border:2px solid var(--line);border-radius:18px;padding:14px 16px}
+.scene h3{font-size:1rem;color:var(--muted);font-family:var(--f-body);font-weight:600;margin-bottom:6px}
+.stage{position:relative;height:150px}
+.actor{position:absolute;top:28px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.78rem;font-weight:600;width:96px;text-align:center}
+.actor svg{width:64px;height:64px}
+.actor.pc{left:0}.actor.srv{left:calc(50% - 48px)}.actor.net{right:0}
+.actor small{font-family:var(--f-mono);font-weight:400;color:var(--muted);font-size:.7rem}
+.wire{position:absolute;top:60px;height:3px;background:repeating-linear-gradient(90deg,var(--line) 0 8px,transparent 8px 14px)}
+.wire.w1{left:80px;right:calc(50% + 40px)}.wire.w2{left:calc(50% + 40px);right:80px}
+.bubble{position:absolute;top:2px;left:0;font-family:var(--f-mono);font-size:.72rem;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--brand);color:#fff;white-space:nowrap;opacity:0;transform:translateX(0);pointer-events:none}
+.bubble.ans{background:var(--good)}
+.bubble.no{background:var(--bad)}
+.ask{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.ask input{flex:1;min-width:150px;font-family:var(--f-mono);font-size:.9rem;border:2px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg);color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-family:var(--f-mono);font-size:.75rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:3px 10px}
+.chip:hover{border-color:var(--brand)}
+.answer{margin-top:10px;font-size:.92rem;min-height:1.4em}
+.answer b{font-family:var(--f-mono)}
+
+/* servidor */
+.server{background:var(--surface);border:2px solid var(--line);border-radius:18px;padding:14px 16px 16px}
+.server .hd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.server .hd h3{font-size:1.2rem}
+.led{width:12px;height:12px;border-radius:50%;background:var(--muted)}
+.led.on{background:var(--good);box-shadow:0 0 0 4px var(--good-soft)}
+.server .hd small{font-family:var(--f-mono);color:var(--muted);font-size:.78rem;margin-left:auto}
+.zone{border:2px solid var(--t-zone);border-radius:12px;margin-top:10px;overflow:hidden;animation:pop .45s}
+.zone .zh{background:var(--t-zone);color:var(--surface);font-family:var(--f-mono);font-weight:700;font-size:.82rem;padding:6px 12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.zone .zh span{opacity:.85;font-weight:400}
+.recs{display:flex;flex-direction:column}
+.rec{display:grid;grid-template-columns:minmax(0,5.5em) 4.6em minmax(0,1fr);gap:8px;align-items:center;padding:6px 12px;border-top:1px solid var(--line);font-family:var(--f-mono);font-size:.82rem;animation:pop .45s}
+.rec:first-child{border-top:0}
+.rec .ty{font-weight:700;color:#fff;background:var(--c);border-radius:6px;text-align:center;font-size:.75rem;padding:1px 0}
+.rec .v{overflow-wrap:anywhere}
+.rec.hit{background:color-mix(in srgb,var(--c) 22%,transparent);outline:2px solid var(--c);outline-offset:-2px}
+.empty{color:var(--muted);font-size:.9rem;padding:10px 2px 2px}
+@keyframes pop{0%{transform:scale(.9);opacity:0}60%{transform:scale(1.03);opacity:1}100%{transform:scale(1)}}
+.own{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:12px}
+@media (max-width:440px){.own{grid-template-columns:1fr}}
+.own input{font-family:var(--f-mono);font-size:.85rem;border:2px solid var(--line);border-radius:10px;padding:7px 9px;background:var(--bg);color:var(--ink);min-width:0}
+
+canvas#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<canvas id="fx" aria-hidden="true"></canvas>
+<header class="band">
+  <div class="wrap">
+    <img src="logo-cecac.jpg" alt="CECAC">
+    <div class="grow">
+      <h1>Monta tu <span>DNS</span></h1>
+      <div class="meta">MP07 Servicios de Red · RA2 · Introducción</div>
+    </div>
+    <a class="sound" href="guia.html" style="text-decoration:none">Guía de conceptos</a>
+    <button class="sound" id="snd" aria-pressed="true">Sonido: sí</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="progress" id="progress" aria-label="Pasos"></nav>
+  <div class="main">
+    <article class="lesson" id="lesson" aria-live="polite"></article>
+    <div class="side">
+      <div class="scene">
+        <h3>Así viaja una pregunta</h3>
+        <div class="stage" id="stage">
+          <div class="wire w1"></div><div class="wire w2"></div>
+          <div class="actor pc"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="10" width="52" height="34" rx="5" fill="var(--t-a)"/><rect x="11" y="15" width="42" height="24" rx="2" fill="var(--surface)"/><rect x="24" y="46" width="16" height="6" fill="var(--t-a)"/><rect x="16" y="52" width="32" height="4" rx="2" fill="var(--t-a)"/></svg>pc01<small>10.10.0.101</small></div>
+          <div class="actor srv"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="14" y="6" width="36" height="52" rx="5" fill="var(--brand)"/><rect x="19" y="13" width="26" height="7" rx="2" fill="var(--surface)"/><rect x="19" y="25" width="26" height="7" rx="2" fill="var(--surface)"/><circle cx="24" cy="46" r="3" fill="var(--good)"/><circle cx="33" cy="46" r="3" fill="var(--surface)"/></svg>ns1 (DNS)<small>10.10.0.10</small></div>
+          <div class="actor net"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="var(--t-cname)" stroke-width="4"/><ellipse cx="32" cy="32" rx="10" ry="24" fill="none" stroke="var(--t-cname)" stroke-width="3"/><line x1="8" y1="32" x2="56" y2="32" stroke="var(--t-cname)" stroke-width="3"/></svg>Internet<small>8.8.8.8</small></div>
+          <div class="bubble" id="b1"></div><div class="bubble ans" id="b2"></div>
+        </div>
+        <form class="ask" id="askf">
+          <label for="q" class="sr" style="position:absolute;left:-9999px">Nombre o dirección a preguntar</label>
+          <input id="q" value="www.smx.lan" spellcheck="false" autocomplete="off">
+          <button class="btn go" type="submit" style="font-size:1rem">Preguntar</button>
+        </form>
+        <div class="chips" id="chips"></div>
+        <div class="answer" id="answer">Escribe un nombre y pulsa «Preguntar».</div>
+      </div>
+      <div class="server">
+        <div class="hd"><span class="led" id="led"></span><h3>Servidor ns1</h3><small>BIND9</small></div>
+        <div id="zones"><p class="empty">Todavía no hay ninguna zona. El servidor no sabe ningún nombre.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const C={zone:"var(--t-zone)",SOA:"var(--t-soa)",NS:"var(--t-ns)",A:"var(--t-a)",CNAME:"var(--t-cname)",MX:"var(--t-mx)",PTR:"var(--t-ptr)",go:"var(--brand)"};
+
+/* ---------- sonido (Web Audio, sin archivos) ---------- */
+let ac=null,soundOn=true;
+function tone(f,d,type="sine",vol=.18,delay=0){
+  if(!soundOn)return;try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const t=ac.currentTime+delay,o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(ac.destination);o.start(t);o.stop(t+d+.02)}catch(e){}
+}
+const sfx={
+  pick:()=>tone(660,.08,"triangle",.12),
+  good:()=>{tone(523,.15,"triangle");tone(659,.15,"triangle",.18,.1);tone(784,.3,"triangle",.18,.2)},
+  bad:()=>{tone(180,.25,"sawtooth",.1);tone(140,.3,"sawtooth",.1,.08)},
+  whoosh:()=>{tone(400,.18,"sine",.08);tone(900,.2,"sine",.06,.08)},
+  win:()=>[523,659,784,1047,784,1047].forEach((f,i)=>tone(f,.22,"triangle",.16,i*.11))
+};
+$("#snd").addEventListener("click",e=>{soundOn=!soundOn;e.currentTarget.setAttribute("aria-pressed",soundOn);e.currentTarget.textContent="Sonido: "+(soundOn?"sí":"no")});
+
+/* ---------- confeti ---------- */
+const cv=$("#fx"),cx=cv.getContext("2d");let parts=[],raf=0;
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function confetti(n=90){
+  if(reduce)return;cv.width=innerWidth;cv.height=innerHeight;
+  const cols=["#8B5CF6","#E0459B","#2563EB","#0E9F9E","#E68A00","#16A34A","#00FBFE"];
+  for(let i=0;i<n;i++)parts.push({x:innerWidth/2+(Math.random()-.5)*200,y:innerHeight*.35,vx:(Math.random()-.5)*12,vy:-Math.random()*11-4,s:5+Math.random()*6,r:Math.random()*6,c:cols[i%cols.length],life:90+Math.random()*40});
+  if(!raf)loop();
+}
+function loop(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  parts=parts.filter(p=>p.life-->0&&p.y<cv.height+20);
+  parts.forEach(p=>{p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.r+=.2;cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);cx.fillStyle=p.c;cx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);cx.restore()});
+  raf=parts.length?requestAnimationFrame(loop):0;if(!raf)cx.clearRect(0,0,cv.width,cv.height);
+}
+
+/* ---------- pasos ---------- */
+// recs: registros que entran en el servidor al completar el paso
+const STEPS=[
+ {tag:"Idea",c:C.go,short:"¿Qué es?",title:"El DNS es la agenda de la red",
+  text:"Los ordenadores se encuentran por su <b>dirección IP</b> (números como 10.10.0.10), pero a las personas nos resulta más fácil recordar <b>nombres</b> (como www.smx.lan). El servicio DNS traduce nombres a direcciones.",
+  analogy:["?","Es como la agenda del móvil: tú buscas «Marta» y el móvil marca su número. Tú no necesitas saberlo de memoria."],
+  task:{type:"ask",prompt:"Pulsa «Preguntar» en la escena de la derecha y mira qué pasa.",need:1}},
+ {tag:"Zona",c:C.zone,short:"Zona",title:"Primero, una zona",
+  text:"Una <b>zona</b> es la parte del árbol de nombres de la que el servidor se encarga. Nuestro dominio del laboratorio es <b>smx.lan</b>. La zona que traduce <b>nombre → IP</b> se llama <b>zona directa</b>.",
+  analogy:["Z","La zona es la página de la agenda que te toca rellenar: solo los contactos de tu grupo."],
+  example:'zone "smx.lan" {\n    type master;      <span class="c">// este servidor es el dueño</span>\n    file "/etc/bind/db.smx.lan";\n};',
+  task:{type:"slots",h:"Crea la zona: arrastra el nombre del dominio",line:['<span class="kw">zone</span>',"{s0}","{ type master; }"],slots:["smx.lan"],cards:["smx.lan","10.10.0.10","www"],hint:"La zona se llama como el dominio, sin números."},
+  zone:"fwd"},
+ {tag:"SOA",c:C.SOA,short:"SOA",title:"SOA: quién manda en la zona",
+  text:"El registro <b>SOA</b> (Start Of Authority) es el primero de toda zona. Dice qué servidor es el principal y lleva un <b>número de serie</b> que sube cada vez que cambias algo.",
+  analogy:["S","Es la portada de la agenda: «Esta página la lleva ns1. Versión 1»."],
+  example:'@  IN  SOA  ns1.smx.lan. admin.smx.lan. (\n           2026102001 )   <span class="c">; número de serie</span>',
+  task:{type:"slots",h:"¿Qué servidor manda en smx.lan?",line:["@","IN",'<span class="kw">SOA</span>',"{s0}","admin.smx.lan."],slots:["ns1.smx.lan."],cards:["pc01.smx.lan.","ns1.smx.lan.","www"],hint:"Manda el servidor DNS, no un ordenador cliente."},
+  recs:[["fwd","@","SOA","ns1.smx.lan. · serie 2026102001"]]},
+ {tag:"NS",c:C.NS,short:"NS",title:"NS: los servidores de nombres",
+  text:"El registro <b>NS</b> (Name Server) indica qué servidores DNS saben responder por esta zona. Fíjate en el <b>punto final</b>: ns1.smx.lan. es un nombre completo.",
+  analogy:["N","«Si tienes dudas sobre esta agenda, pregunta a ns1»."],
+  example:'@   IN   NS   ns1.smx.lan.',
+  task:{type:"slots",h:"Pon el servidor de nombres",line:["@","IN",'<span class="kw">NS</span>',"{s0}"],slots:["ns1.smx.lan."],cards:["10.10.0.10","ns1.smx.lan.","correo"],hint:"Un NS apunta a un nombre, no a una IP."},
+  recs:[["fwd","@","NS","ns1.smx.lan."]]},
+ {tag:"A",c:C.A,short:"A",title:"A: de nombre a dirección",
+  text:"El registro <b>A</b> es el más usado: une un <b>nombre</b> con su <b>dirección IPv4</b>. Cada máquina del laboratorio tiene el suyo. El nombre corto «pc01» se completa solo: pc01.smx.lan.",
+  analogy:["A","Es un contacto de la agenda: nombre y número."],
+  example:'ns1    IN   A   10.10.0.10\nsrv1   IN   A   10.10.0.11',
+  task:{type:"slots",h:"¿Qué dirección tiene pc01?",line:["pc01","IN",'<span class="kw">A</span>',"{s0}"],slots:["10.10.0.101"],cards:["pc01.smx.lan.","10.10.0.101","10.10.0.999"],hint:"Una IPv4 son cuatro números del 0 al 255."},
+  recs:[["fwd","ns1","A","10.10.0.10"],["fwd","srv1","A","10.10.0.11"],["fwd","pc01","A","10.10.0.101"]]},
+ {tag:"CNAME",c:C.CNAME,short:"CNAME",title:"CNAME: un apodo",
+  text:"El registro <b>CNAME</b> es un <b>alias</b>: otro nombre para una máquina que ya existe. La web www vive en ns1, así que www es un apodo de ns1.",
+  analogy:["C","En la agenda, «Profe» y «Ángel» llevan al mismo número."],
+  example:'correo   IN   CNAME   srv1',
+  task:{type:"slots",h:"www es un apodo de…",line:["www","IN",'<span class="kw">CNAME</span>',"{s0}"],slots:["ns1"],cards:["10.10.0.10","ns1","MX"],hint:"Un alias apunta a otro nombre, no a una IP."},
+  recs:[["fwd","www","CNAME","ns1"],["fwd","correo","CNAME","srv1"]]},
+ {tag:"MX",c:C.MX,short:"MX",title:"MX: a dónde va el correo",
+  text:"El registro <b>MX</b> (Mail eXchanger) dice qué servidor recibe el correo del dominio. Lleva un número de <b>prioridad</b>: cuanto más bajo, más preferido.",
+  analogy:["M","Es la dirección del buzón de la familia."],
+  example:'@   IN   MX   10   srv1.smx.lan.',
+  task:{type:"slots",h:"El correo de smx.lan va a srv1 con prioridad 10",line:["@","IN",'<span class="kw">MX</span>',"{s0}","{s1}"],slots:["10","srv1.smx.lan."],cards:["10","srv1.smx.lan.","correo","10.10.0.11"],hint:"Primero la prioridad (un número) y después el servidor con su punto final. Un MX no puede apuntar a un alias."},
+  recs:[["fwd","@","MX","10 srv1.smx.lan."]]},
+ {tag:"Zona inversa",c:C.PTR,short:"Inversa",title:"Zona inversa y PTR: de dirección a nombre",
+  text:"A veces queremos lo contrario: saber el <b>nombre</b> de una <b>IP</b>. Para eso hay otra zona, la <b>inversa</b>, con registros <b>PTR</b>. Su nombre se escribe con la red al revés: 10.10.0 → <b>0.10.10.in-addr.arpa</b>. A la izquierda va solo el último número de la IP.",
+  analogy:["P","Te llama un número desconocido y la agenda te dice de quién es."],
+  example:'zone "0.10.10.in-addr.arpa" { type master; };\n\n10    IN   PTR   ns1.smx.lan.',
+  task:{type:"slots",h:"Crea la zona inversa y su PTR",line:['<span class="kw">zone</span>',"{s0}","→","101","IN",'<span class="kw">PTR</span>',"{s1}"],slots:["0.10.10.in-addr.arpa","pc01.smx.lan."],cards:["10.10.0.0","0.10.10.in-addr.arpa","pc01.smx.lan.","10.10.0.101"],hint:"La red va al revés y acaba en in-addr.arpa. El PTR devuelve un nombre."},
+  zone:"rev",recs:[["rev","10","PTR","ns1.smx.lan."],["rev","101","PTR","pc01.smx.lan."]]},
+ {tag:"¡Prueba!",c:C.go,short:"¡Prueba!",title:"Tu DNS ya funciona",
+  text:"Pregunta en la escena por nombres y direcciones. Mira qué registro responde (se ilumina en el servidor). Si preguntas por algo que no es de smx.lan, ns1 se lo pregunta a internet.",
+  analogy:["+","Ahora añade tu propio equipo al final del servidor y búscalo."],
+  task:{type:"ask",prompt:"Haz 3 preguntas distintas. Prueba también una IP y un nombre de internet.",need:3}}
+];
+const done=new Array(STEPS.length).fill(false);
+let cur=0,asked=new Set(),own=[];
+
+function renderProgress(){
+  $("#progress").innerHTML=STEPS.map((s,i)=>{
+    const reach=i===0||done[i-1]||done[i];
+    return `<button class="pill${done[i]?" done":""}${i===cur?" cur":""}" style="--c:${s.c}" data-i="${i}" ${reach?"":"disabled"} aria-current="${i===cur?"step":"false"}"><i>${done[i]?"✓":i+1}</i>${esc(s.short)}</button>`}).join("");
+}
+$("#progress").addEventListener("click",e=>{const b=e.target.closest(".pill");if(b&&!b.disabled)go(+b.dataset.i)});
+
+function renderLesson(){
+  const s=STEPS[cur],L=$("#lesson");L.style.setProperty("--c",s.c);
+  let h=`<span class="tag"><b>${cur+1}/${STEPS.length}</b>${esc(s.tag)}</span><h2>${esc(s.title)}</h2><p>${s.text}</p>`;
+  if(s.analogy)h+=`<div class="analogy"><span class="ico" aria-hidden="true">${s.analogy[0]}</span><p>${esc(s.analogy[1])}</p></div>`;
+  if(s.example)h+=`<pre class="example">${s.example}</pre>`;
+  const t=s.task;
+  if(t.type==="slots"){
+    let k=0;const line=t.line.map(x=>x.startsWith("{s")?`<span class="slot" data-k="${k++}" tabindex="0" role="button" aria-label="Hueco ${k}">suelta aquí</span>`:`<span>${x}</span>`).join("");
+    const cards=t.cards.slice().sort(()=>Math.random()-.5);
+    h+=`<div class="challenge"><h3>Reto · ${esc(t.h)}</h3><div class="line">${line}</div><div class="cards">${cards.map(c=>`<button class="card" draggable="true" data-v="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join("")}</div><div class="hint" id="hint">Arrastra una tarjeta al hueco, o tócala y luego toca el hueco.</div></div>`;
+  }else{
+    h+=`<div class="challenge"><h3>Reto</h3><p style="margin:0">${esc(t.prompt)}</p><div class="hint" id="hint">${progressAsk()}</div></div>`;
+  }
+  h+=`<div class="nav"><button class="btn" id="prev" ${cur===0?"disabled":""}>← Anterior</button><button class="btn go" id="next" ${done[cur]?"":"disabled"}>${cur===STEPS.length-1?"Terminar":"Siguiente →"}</button></div>`;
+  L.innerHTML=h;
+  $("#prev").onclick=()=>go(cur-1);
+  $("#next").onclick=()=>{if(cur<STEPS.length-1)go(cur+1);else{sfx.win();confetti(160);$("#hint").className="hint good";$("#hint").textContent="¡Enhorabuena! Has montado un servidor DNS con zona directa, zona inversa y seis tipos de registro."}};
+  if(t.type==="slots"){
+    if(done[cur])t.slots.forEach((v,i)=>{const sl=L.querySelector(`.slot[data-k="${i}"]`);sl.textContent=v;sl.classList.add("filled");L.querySelectorAll(".card").forEach(c=>{if(c.dataset.v===v)c.classList.add("used")})});
+    wireDnD();
+  }
+  $("#chips").innerHTML=chipList().map(c=>`<button class="chip" data-q="${esc(c)}">${esc(c)}</button>`).join("");
+}
+function progressAsk(){const t=STEPS[cur].task;const n=Math.min(asked.size,t.need);return done[cur]?"¡Conseguido!":`Preguntas hechas: ${n} de ${t.need}`}
+function go(i){cur=Math.max(0,Math.min(STEPS.length-1,i));if(STEPS[cur].task.type==="ask")asked=new Set();renderProgress();renderLesson();renderZones();scrollToTop()}
+function scrollToTop(){const L=$("#lesson");if(L.getBoundingClientRect().top<0)L.scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"})}
+
+/* ---------- arrastrar y soltar (+ tocar) ---------- */
+let armed=null;
+function wireDnD(){
+  const L=$("#lesson");
+  L.querySelectorAll(".card").forEach(c=>{
+    c.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",c.dataset.v);c.classList.add("dragging");sfx.pick()});
+    c.addEventListener("dragend",()=>c.classList.remove("dragging"));
+    c.addEventListener("click",()=>{L.querySelectorAll(".card").forEach(x=>x.setAttribute("aria-pressed",String(x===c&&armed!==c)));armed=armed===c?null:c;sfx.pick();L.querySelectorAll(".slot:not(.filled)").forEach(s=>s.classList.toggle("armed",!!armed))});
+  });
+  L.querySelectorAll(".slot").forEach(s=>{
+    s.addEventListener("dragover",e=>{if(s.classList.contains("filled"))return;e.preventDefault();s.classList.add("over")});
+    s.addEventListener("dragleave",()=>s.classList.remove("over"));
+    s.addEventListener("drop",e=>{e.preventDefault();s.classList.remove("over");place(s,e.dataTransfer.getData("text/plain"))});
+    const tap=()=>{if(armed&&!s.classList.contains("filled"))place(s,armed.dataset.v)};
+    s.addEventListener("click",tap);s.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();tap()}});
+  });
+}
+function place(slot,v){
+  const t=STEPS[cur].task,k=+slot.dataset.k,hint=$("#hint"),L=$("#lesson");
+  armed=null;L.querySelectorAll(".card").forEach(x=>x.setAttribute("aria-pressed","false"));L.querySelectorAll(".slot").forEach(s=>s.classList.remove("armed"));
+  if(v===t.slots[k]){
+    slot.textContent=v;slot.classList.add("filled");sfx.good();
+    L.querySelectorAll(".card").forEach(c=>{if(c.dataset.v===v)c.classList.add("used")});
+    const left=L.querySelectorAll(".slot:not(.filled)").length;
+    if(left===0)complete();else{hint.className="hint good";hint.textContent="¡Bien! Ahora el siguiente hueco."}
+  }else{
+    slot.classList.remove("wrong");void slot.offsetWidth;slot.classList.add("wrong");sfx.bad();
+    hint.className="hint bad";hint.textContent=`«${v}» no va ahí. Pista: ${t.hint}`;
+  }
+}
+function complete(){
+  if(!done[cur]){done[cur]=true;confetti();}
+  setTimeout(sfx.win,250);
+  const hint=$("#hint");hint.className="hint good";hint.textContent=STEPS[cur].task.type==="slots"?"¡Correcto! El registro ya está en el servidor ns1.":"¡Conseguido!";
+  const n=$("#next");n.disabled=false;n.classList.add("pulse");
+  renderProgress();renderZones(true);
+}
+
+/* ---------- servidor: zonas y registros ---------- */
+function allRecs(){
+  const r=[];STEPS.forEach((s,i)=>{if(done[i]&&s.recs)s.recs.forEach(x=>r.push({zone:x[0],name:x[1],type:x[2],val:x[3]}))});
+  own.forEach(o=>{r.push({zone:"fwd",name:o.name,type:"A",val:o.ip,own:true});const oct=o.ip.split(".");if(o.ip.startsWith("10.10.0."))r.push({zone:"rev",name:oct[3],type:"PTR",val:o.name+".smx.lan.",own:true})});
+  return r;
+}
+const hasZone=z=>STEPS.some((s,i)=>done[i]&&s.zone===z);
+let lastHit=null;
+function renderZones(){
+  const box=$("#zones"),recs=allRecs();
+  $("#led").classList.toggle("on",hasZone("fwd"));
+  if(!hasZone("fwd")){box.innerHTML=`<p class="empty">Todavía no hay ninguna zona. El servidor no sabe ningún nombre.</p>`;return}
+  const z=(id,title,sub)=>{const rr=recs.filter(r=>r.zone===id);return `<div class="zone"><div class="zh">${title}<span>${sub}</span></div><div class="recs">${rr.length?rr.map(r=>`<div class="rec${lastHit&&lastHit.zone===id&&lastHit.name===r.name&&lastHit.type===r.type?" hit":""}" style="--c:${C[r.type]}"><span>${esc(r.name)}</span><span class="ty">${r.type}</span><span class="v">${esc(r.val)}</span></div>`).join(""):`<p class="empty" style="padding:8px 12px">Zona vacía: añade registros.</p>`}</div></div>`};
+  let h=z("fwd","smx.lan","zona directa · nombre → IP");
+  if(hasZone("rev"))h+=z("rev","0.10.10.in-addr.arpa","zona inversa · IP → nombre");
+  if(done[STEPS.length-2])h+=`<form class="own" id="ownf"><input id="on" placeholder="nombre (ej. tablet)" aria-label="Nombre del equipo" spellcheck="false"><input id="oi" placeholder="IP (ej. 10.10.0.50)" aria-label="Dirección IP"><button class="btn" type="submit">Añadir A</button></form><div class="hint" id="ownhint"></div>`;
+  box.innerHTML=h;
+  const f=$("#ownf");if(f)f.addEventListener("submit",e=>{e.preventDefault();
+    const n=$("#on").value.trim().toLowerCase(),ip=$("#oi").value.trim(),oh=$("#ownhint");
+    if(!/^[a-z][a-z0-9-]{0,20}$/.test(n)){oh.className="hint bad";oh.textContent="El nombre: letras, números o guiones, sin espacios ni puntos.";sfx.bad();return}
+    if(!(/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)&&ip.split(".").every(o=>+o<=255))){oh.className="hint bad";oh.textContent="La IP: cuatro números del 0 al 255 separados por puntos.";sfx.bad();return}
+    own=own.filter(o=>o.name!==n);own.push({name:n,ip});sfx.good();renderZones();
+    $("#q").value=n+".smx.lan";$("#ownhint").className="hint good";$("#ownhint").textContent=`Añadido ${n}.smx.lan → ${ip}. Pulsa «Preguntar».`;
+    $("#chips").innerHTML=chipList().map(c=>`<button class="chip" data-q="${esc(c)}">${esc(c)}</button>`).join("");
+  });
+}
+
+/* ---------- preguntar ---------- */
+const EXT={"www.google.com":"142.250.200.68","www.gencat.cat":"83.247.151.214","www.xtec.cat":"213.176.163.137"};
+function chipList(){
+  const base=["www.smx.lan","pc01.smx.lan","ns1.smx.lan","correo.smx.lan","smx.lan (correo)","10.10.0.101","www.google.com","impresora.smx.lan"];
+  return base.concat(own.map(o=>o.name+".smx.lan"));
+}
+function resolve(q){
+  q=q.trim().toLowerCase().replace(/\.$/,"");
+  const recs=allRecs();
+  if(cur===0&&!hasZone("fwd"))return {kind:"demo",q,ans:"10.10.0.10"};
+  if(!hasZone("fwd")&&!EXT[q])return {kind:"nozone",q};
+  if(q==="smx.lan (correo)"||q==="smx.lan mx"){const mx=recs.find(r=>r.type==="MX");return mx?{kind:"ok",q:"smx.lan",ans:"correo → srv1.smx.lan (prioridad 10)",hit:[mx]}:{kind:"nodata",q:"smx.lan",why:"Aún no hay registro MX."}}
+  if(/^\d{1,3}(\.\d{1,3}){3}$/.test(q)){
+    if(!hasZone("rev"))return {kind:"nodata",q,why:"Para buscar el nombre de una IP hace falta la zona inversa (paso 8)."};
+    const p=recs.find(r=>r.zone==="rev"&&q.startsWith("10.10.0.")&&r.name===q.split(".")[3]);
+    return p?{kind:"ok",q,ans:p.val.replace(/\.$/,""),hit:[p],rev:true}:{kind:"nx",q};
+  }
+  if(q.endsWith(".smx.lan")||q==="smx.lan"||!q.includes(".")){
+    let name=q.includes(".")?q.replace(/\.?smx\.lan$/,"")||"@":q;const chain=[];
+    for(let i=0;i<5;i++){
+      const a=recs.find(r=>r.zone==="fwd"&&r.name===name&&r.type==="A");if(a){chain.push(a);return {kind:"ok",q,ans:a.val,hit:chain}}
+      const c=recs.find(r=>r.zone==="fwd"&&r.name===name&&r.type==="CNAME");if(c){chain.push(c);name=c.val;continue}
+      break;
+    }
+    return chain.length?{kind:"nodata",q,why:"El alias apunta a un nombre que aún no tiene registro A."}:{kind:"nx",q};
+  }
+  if(EXT[q])return {kind:"ext",q,ans:EXT[q]};
+  return {kind:"nx",q,outside:true};
+}
+let busy=false;
+function animate(r){
+  const st=$("#stage"),b1=$("#b1"),b2=$("#b2"),W=st.clientWidth;
+  const pcX=10,srvX=W/2-30,netX=W-110;
+  b1.textContent="¿"+(r.q.length>18?r.q.slice(0,17)+"…":r.q)+"?";
+  const good=r.kind==="ok"||r.kind==="ext"||r.kind==="demo";
+  b2.className="bubble ans"+(good?"":" no");
+  b2.textContent=good?(r.ans.length>20?r.ans.slice(0,19)+"…":r.ans):r.kind==="nozone"?"no sé nada":"no existe";
+  const ext=r.kind==="ext"||r.outside;
+  if(reduce){b1.style.opacity=0;b2.style.opacity=1;b2.style.transform=`translateX(${pcX}px)`;return Promise.resolve()}
+  const leg=(el,from,to,ms)=>el.animate([{transform:`translateX(${from}px)`,opacity:1},{transform:`translateX(${to}px)`,opacity:1}],{duration:ms,easing:"ease-in-out",fill:"forwards"}).finished;
+  b2.style.opacity=0;sfx.whoosh();
+  let p=leg(b1,pcX,srvX,650);
+  if(ext)p=p.then(()=>{sfx.whoosh();return leg(b1,srvX,netX-20,550)}).then(()=>leg(b1,netX-20,srvX,450));
+  return p.then(()=>{b1.animate([{opacity:1},{opacity:0}],{duration:150,fill:"forwards"});sfx.whoosh();return leg(b2,srvX,pcX,650)});
+}
+function explain(r){
+  const a=$("#answer");
+  const m={
+    ok:()=>r.rev?`La IP <b>${esc(r.q)}</b> es <b>${esc(r.ans)}</b>. Ha respondido un registro <b>PTR</b> de la zona inversa.`:r.hit.length>1?`<b>${esc(r.q)}</b> es un alias (<b>CNAME</b>) de <b>${esc(r.hit[r.hit.length-1].name)}</b>, cuya dirección (registro <b>A</b>) es <b>${esc(r.ans)}</b>.`:r.hit[0].type==="MX"?`El correo de smx.lan va a <b>srv1.smx.lan</b>: lo dice el registro <b>MX</b>.`:`<b>${esc(r.q)}</b> → <b>${esc(r.ans)}</b>. Ha respondido un registro <b>A</b> de la zona smx.lan.`,
+    ext:()=>`<b>${esc(r.q)}</b> no es de smx.lan: ns1 lo ha preguntado a internet (8.8.8.8) y responde <b>${esc(r.ans)}</b>.`,
+    nx:()=>r.outside?`<b>${esc(r.q)}</b> no existe ni en smx.lan ni en internet.`:`<b>${esc(r.q)}</b> no está en la zona: falta su registro. ¿Lo añades tú abajo?`,
+    nodata:()=>esc(r.why),
+    demo:()=>`El PC pregunta «¿dónde está <b>${esc(r.q)}</b>?» y el DNS contesta <b>10.10.0.10</b>. Ahora vas a construir tú el servidor que da esa respuesta.`,
+    nozone:()=>`ns1 aún no tiene ninguna zona: no sabe ningún nombre. Crea la zona en el paso 2.`
+  };
+  a.innerHTML=m[r.kind]();
+}
+$("#askf").addEventListener("submit",e=>{e.preventDefault();if(busy)return;const q=$("#q").value.trim();if(!q)return;
+  busy=true;const r=resolve(q);
+  animate(r).then(()=>{busy=false;explain(r);lastHit=r.hit?r.hit[r.hit.length-1]:null;
+    if(r.hit){lastHit=r.hit[r.hit.length-1];renderZones()}
+    if(r.kind==="ok"||r.kind==="ext"||r.kind==="demo")sfx.good();else sfx.bad();
+    const t=STEPS[cur].task;if(t.type==="ask"&&!done[cur]){asked.add(r.q);const h=$("#hint");if(h)h.textContent=progressAsk();if(asked.size>=t.need)complete()}
+  });
+});
+$("#chips").addEventListener("click",e=>{const c=e.target.closest(".chip");if(c){$("#q").value=c.dataset.q;$("#askf").requestSubmit()}});
+
+go(0);
+})();
+</script>
+
+</body></html>
