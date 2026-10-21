@@ -9,3 +9,10 @@ SOA, NS, A, CNAME, MX, zona inversa y PTR, y comprueba las consultas en una esce
   (árbol de nombres, FQDN, zonas, registros, SOA, resolución, tipos de servidor, BIND9, `dig`, errores típicos y glosario)
 
 Páginas HTML autocontenidas, sin dependencias: se pueden abrir también con doble clic.
+
+## Licencia
+
+© 2026 Angel Ortiz. El código y los textos se publican con licencia MIT (ver `LICENSE`):
+se pueden usar, copiar, modificar y redistribuir libremente conservando el aviso de autoría.
+
+El logotipo de CECAC pertenece al centro y no está incluido en esta licencia.
